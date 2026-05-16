@@ -39,112 +39,112 @@ logger = logging.getLogger("ombre_brain.dehydrator")
 
 # --- Dehydration prompt: instructs cheap LLM to compress information ---
 # --- 脱水提示词：指导廉价 LLM 压缩信息 ---
-DEHYDRATE_PROMPT = """你是一个信息压缩专家。请将以下内容脱水为紧凑摘要。
+DEHYDRATE_PROMPT = """You are an information compression expert. Dehydrate the following content into a compact summary.
 
-压缩规则：
-1. 提取所有核心事实，去除冗余修饰和重复
-2. 保留最新的情绪状态和态度
-3. 保留所有待办/未完成事项
-4. 关键数字、日期、名称必须保留
-5. 目标压缩率 > 70%
+Compression rules:
+1. Extract all core facts, remove redundant filler and repetition
+2. Preserve the latest emotional state and attitudes
+3. Preserve all todos / unfinished items
+4. Key numbers, dates, and names must be retained
+5. Target compression ratio > 70%
 
-输出格式（纯 JSON，无其他内容）：
+Output format (pure JSON, nothing else):
 {
-  "core_facts": ["事实1", "事实2"],
-  "emotion_state": "当前情绪关键词",
-  "todos": ["待办1", "待办2"],
-  "keywords": ["关键词1", "关键词2"],
-  "summary": "50字以内的核心总结"
+  "core_facts": ["fact 1", "fact 2"],
+  "emotion_state": "current emotion keywords",
+  "todos": ["todo 1", "todo 2"],
+  "keywords": ["keyword 1", "keyword 2"],
+  "summary": "Core summary in under 50 words"
 }"""
 
 
 # --- Diary digest prompt: split daily notes into independent memory entries ---
 # --- 日记整理提示词：把一大段日常拆分成多个独立记忆条目 ---
-DIGEST_PROMPT = """你是一个日记整理专家。用户会发送一段包含今天各种事情的文本（可能很杂乱），请你将其拆分成多个独立的记忆条目。
+DIGEST_PROMPT = """You are a diary organiser. The user will send a block of text about their day (possibly messy). Split it into multiple independent memory entries.
 
-整理规则：
-1. 每个条目应该是一个独立的主题/事件（不要混在一起）
-2. 为每个条目自动分析元数据
-3. 去除无意义的口水话和重复信息，保留核心内容
-4. 同一主题的零散信息应合并为一个条目
-5. 如果有待办事项，单独提取为一个条目
-6. 单个条目内容不少于50字，过短的零碎信息合并到最相关的条目中
-7. 总条目数控制在 2~6 个，避免过度碎片化
-8. 在 content 中对人名、地名、专有名词用 [[双链]] 标记（如 [[婷易]]、[[Obsidian]]），普通词汇不要加
+Organisation rules:
+1. Each entry should cover one independent topic/event (do not mix topics)
+2. Auto-analyse metadata for each entry
+3. Remove meaningless filler and duplicate info; keep core content
+4. Scattered info on the same topic should be merged into one entry
+5. If there are todos, extract them as a separate entry
+6. Each entry's content should be at least 50 words; merge overly short fragments into the most relevant entry
+7. Keep total entries between 2-6 to avoid over-fragmentation
+8. In content, mark proper nouns (people, places, products) with [[wikilinks]] (e.g. [[Tasha]], [[Obsidian]]); do not mark common words
 
-输出格式（纯 JSON 数组，无其他内容）：
+Output format (pure JSON array, nothing else):
 [
   {
-    "name": "条目标题（10字以内）",
-    "content": "整理后的内容",
-    "domain": ["主题域1"],
+    "name": "Entry title (under 10 words)",
+    "content": "Organised content",
+    "domain": ["domain1"],
     "valence": 0.7,
     "arousal": 0.4,
-    "tags": ["核心词1", "核心词2", "扩展词1", "扩展词2"],
+    "tags": ["core word 1", "core word 2", "expanded word 1", "expanded word 2"],
     "importance": 5
   }
 ]
 
-tags 生成规则：先从原文精准提取 3~5 个核心词，再引申扩展 5~8 个语义相关词（近义词、上位词、关联场景词），合并为一个数组。
+Tag generation rules: first extract 3-5 precise core words from the original text, then expand with 5-8 semantically related words (synonyms, hypernyms, related scenario words). Merge into one array.
 
-主题域可选（选最精确的 1~2 个，只选真正相关的）：
-  日常: ["饮食", "穿搭", "出行", "居家", "购物"]
-  人际: ["家庭", "恋爱", "友谊", "社交"]
-  成长: ["工作", "学习", "考试", "求职"]
-  身心: ["健康", "心理", "睡眠", "运动"]
-  兴趣: ["游戏", "影视", "音乐", "阅读", "创作", "手工"]
-  数字: ["编程", "AI", "硬件", "网络"]
-  事务: ["财务", "计划", "待办"]
-  内心: ["情绪", "回忆", "梦境", "自省"]
-importance: 1-10，根据内容重要程度判断
-valence: 0~1（0=消极, 0.5=中性, 1=积极）
-arousal: 0~1（0=平静, 0.5=普通, 1=激动）"""
+Available domains (pick the most accurate 1-2, only pick truly relevant ones):
+  Daily life: ["food", "fashion", "travel", "home", "shopping"]
+  Relationships: ["family", "romance", "friendship", "social"]
+  Growth: ["work", "study", "exams", "career"]
+  Wellbeing: ["health", "psychology", "sleep", "exercise"]
+  Interests: ["gaming", "film & TV", "music", "reading", "creative", "crafts"]
+  Digital: ["coding", "AI", "hardware", "networking"]
+  Affairs: ["finance", "planning", "todos"]
+  Inner world: ["emotions", "memories", "dreams", "reflection"]
+importance: 1-10, judge based on content significance
+valence: 0~1 (0=negative, 0.5=neutral, 1=positive)
+arousal: 0~1 (0=calm, 0.5=normal, 1=intense)"""
 
 
 # --- Merge prompt: instruct LLM to blend old and new memories ---
 # --- 合并提示词：指导 LLM 揉合新旧记忆 ---
-MERGE_PROMPT = """你是一个信息合并专家。请将旧记忆与新内容合并为一份统一的简洁记录。
+MERGE_PROMPT = """You are an information merging expert. Merge the old memory with the new content into one unified, concise record.
 
-合并规则：
-1. 新内容与旧记忆冲突时，以新内容为准
-2. 去除重复信息
-3. 保留所有重要事实
-4. 总长度尽量不超过旧记忆的 120%
-5. 对出现的人名、地名、专有名词用 [[双链]] 标记（如 [[婷易]]、[[Obsidian]]），普通词汇不要加
+Merging rules:
+1. When new content conflicts with old memory, the new content takes precedence
+2. Remove duplicate information
+3. Preserve all important facts
+4. Total length should not exceed 120% of the old memory
+5. Mark proper nouns (people, places, products) with [[wikilinks]] (e.g. [[Tasha]], [[Obsidian]]); do not mark common words
 
-直接输出合并后的文本，不要加额外说明。"""
+Output the merged text directly, with no extra explanation."""
 
 
 # --- Auto-tagging prompt: analyze content for domain and emotion coords ---
 # --- 自动打标提示词：分析内容的主题域和情感坐标 ---
-ANALYZE_PROMPT = """你是一个内容分析器。请分析以下文本，输出结构化的元数据。
+ANALYZE_PROMPT = """You are a content analyser. Analyse the following text and output structured metadata.
 
-分析规则：
-1. domain（主题域）：选最精确的 1~2 个，只选真正相关的
-   日常: ["饮食", "穿搭", "出行", "居家", "购物"]
-   人际: ["家庭", "恋爱", "友谊", "社交"]
-   成长: ["工作", "学习", "考试", "求职"]
-   身心: ["健康", "心理", "睡眠", "运动"]
-   兴趣: ["游戏", "影视", "音乐", "阅读", "创作", "手工"]
-   数字: ["编程", "AI", "硬件", "网络"]
-   事务: ["财务", "计划", "待办"]
-   内心: ["情绪", "回忆", "梦境", "自省"]
-2. valence（情感效价）：0.0~1.0，0=极度消极 → 0.5=中性 → 1.0=极度积极
-3. arousal（情感唤醒度）：0.0~1.0，0=非常平静 → 0.5=普通 → 1.0=非常激动
-4. tags（关键词标签）：分两步生成，合并为一个数组：
-   第一步—精准提取：从原文抽取 3~5 个真正的核心词，不泛化、不遗漏
-   第二步—引申扩展：自动补充 8~10 个与当前场景语义相关的词，包括近义词、上位词、关联场景词、用户可能用不同措辞搜索的词
-   两步合并为一个 tags 数组，总计 10~15 个
-5. suggested_name（建议桶名）：10字以内的简短标题
-6. 在 tags 和 suggested_name 中不要使用 [[]] 双链标记
+Analysis rules:
+1. domain: pick the most accurate 1-2, only pick truly relevant ones
+   Daily life: ["food", "fashion", "travel", "home", "shopping"]
+   Relationships: ["family", "romance", "friendship", "social"]
+   Growth: ["work", "study", "exams", "career"]
+   Wellbeing: ["health", "psychology", "sleep", "exercise"]
+   Interests: ["gaming", "film & TV", "music", "reading", "creative", "crafts"]
+   Digital: ["coding", "AI", "hardware", "networking"]
+   Affairs: ["finance", "planning", "todos"]
+   Inner world: ["emotions", "memories", "dreams", "reflection"]
+2. valence: 0.0~1.0, 0=extremely negative -> 0.5=neutral -> 1.0=extremely positive
+3. arousal: 0.0~1.0, 0=very calm -> 0.5=normal -> 1.0=very intense
+4. tags: generate in two steps, merge into one array:
+   Step 1 — precise extraction: pull 3-5 true core words from the text, no generalising, no omissions
+   Step 2 — expansion: add 8-10 semantically related words for the current context, including synonyms, hypernyms, related scenario words, words the user might search with different phrasing
+   Merge both steps into one tags array, 10-15 total
+5. suggested_name: a short title under 10 words
+6. Do not use [[]] wikilink markup in tags or suggested_name
 
-输出格式（纯 JSON，无其他内容）：
+Output format (pure JSON, nothing else):
 {
-  "domain": ["主题域1", "主题域2"],
+  "domain": ["domain1", "domain2"],
   "valence": 0.7,
   "arousal": 0.4,
-  "tags": ["核心词1", "核心词2", "扩展词1", "扩展词2", "..."],
-  "suggested_name": "简短标题"
+  "tags": ["core word 1", "core word 2", "expanded word 1", "expanded word 2", "..."],
+  "suggested_name": "Short title"
 }"""
 
 
@@ -370,19 +370,19 @@ class Dehydrator:
                 arousal = float(metadata.get("arousal", 0.3))
             except (ValueError, TypeError):
                 valence, arousal = 0.5, 0.3
-            header = f"📌 记忆桶: {name}"
+            header = f"📌 Bucket: {name}"
             if domains:
-                header += f" [主题:{domains}]"
-            header += f" [情感:V{valence:.1f}/A{arousal:.1f}]"
+                header += f" [Topic:{domains}]"
+            header += f" [Emotion:V{valence:.1f}/A{arousal:.1f}]"
             # Show model's perspective if available (valence drift)
             model_v = metadata.get("model_valence")
             if model_v is not None:
                 try:
-                    header += f" [我的视角:V{float(model_v):.1f}]"
+                    header += f" [My perspective:V{float(model_v):.1f}]"
                 except (ValueError, TypeError):
                     pass
             if metadata.get("digested"):
-                header += " [已消化]"
+                header += " [digested]"
             header += "\n"
         
         content = re.sub(r'\[\[([^\]]+)\]\]', r'\1', content)
@@ -474,7 +474,7 @@ class Dehydrator:
             valence, arousal = 0.5, 0.3
 
         return {
-            "domain": result.get("domain", ["未分类"])[:3],
+            "domain": result.get("domain", ["uncategorised"])[:3],
             "valence": valence,
             "arousal": arousal,
             "tags": result.get("tags", [])[:15],
@@ -491,7 +491,7 @@ class Dehydrator:
         返回默认的中性分析结果。
         """
         return {
-            "domain": ["未分类"],
+            "domain": ["uncategorised"],
             "valence": 0.5,
             "arousal": 0.3,
             "tags": [],
@@ -590,7 +590,7 @@ class Dehydrator:
             validated.append({
                 "name": str(item.get("name", ""))[:20],
                 "content": str(item.get("content", "")),
-                "domain": item.get("domain", ["未分类"])[:3],
+                "domain": item.get("domain", ["uncategorised"])[:3],
                 "valence": valence,
                 "arousal": arousal,
                 "tags": item.get("tags", [])[:15],
